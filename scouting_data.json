@@ -1,0 +1,290 @@
+{
+  "Bearman": {
+    "Driving": {
+      "rating": 5
+    },
+    "Iron Play": {
+      "rating": 3
+    },
+    "Short Game": {
+      "rating": 2
+    },
+    "Putting": {
+      "rating": 4
+    },
+    "notes": "",
+    "X-Factor": {
+      "rating": 4
+    }
+  },
+  "Danny": {
+    "Driving": {
+      "rating": 4
+    },
+    "Iron Play": {
+      "rating": 4
+    },
+    "Short Game": {
+      "rating": 3
+    },
+    "Putting": {
+      "rating": 3
+    },
+    "notes": "",
+    "X-Factor": {
+      "rating": 3
+    }
+  },
+  "Doug": {
+    "Driving": {
+      "rating": 2
+    },
+    "Iron Play": {
+      "rating": 2
+    },
+    "Short Game": {
+      "rating": 2
+    },
+    "Putting": {
+      "rating": 3
+    },
+    "notes": "",
+    "X-Factor": {
+      "rating": 5
+    }
+  },
+  "Fish": {
+    "Driving": {
+      "rating": 5
+    },
+    "Iron Play": {
+      "rating": 5
+    },
+    "Short Game": {
+      "rating": 4
+    },
+    "Putting": {
+      "rating": 4
+    },
+    "notes": "",
+    "X-Factor": {
+      "rating": 4
+    }
+  },
+  "Larson": {
+    "Driving": {
+      "rating": 3
+    },
+    "Iron Play": {
+      "rating": 4
+    },
+    "Short Game": {
+      "rating": 5
+    },
+    "Putting": {
+      "rating": 4
+    },
+    "notes": "",
+    "X-Factor": {
+      "rating": 3
+    }
+  },
+  "Littel": {
+    "Driving": {
+      "rating": 3
+    },
+    "Iron Play": {
+      "rating": 3
+    },
+    "Short Game": {
+      "rating": 3
+    },
+    "Putting": {
+      "rating": 3
+    },
+    "notes": "",
+    "X-Factor": {
+      "rating": 3
+    }
+  },
+  "Meyer": {
+    "Driving": {
+      "rating": 2
+    },
+    "Iron Play": {
+      "rating": 2
+    },
+    "Short Game": {
+      "rating": 2
+    },
+    "Putting": {
+      "rating": 2
+    },
+    "notes": "",
+    "X-Factor": {
+      "rating": 3
+    }
+  },
+  "Rames": {
+    "Driving": {
+      "rating": 4
+    },
+    "Iron Play": {
+      "rating": 4
+    },
+    "Short Game": {
+      "rating": 3
+    },
+    "Putting": {
+      "rating": 5
+    },
+    "notes": "",
+    "X-Factor": {
+      "rating": 4
+    }
+  },
+  "AB": {
+    "Driving": {
+      "rating": 3
+    },
+    "Iron Play": {
+      "rating": 3
+    },
+    "Short Game": {
+      "rating": 3
+    },
+    "Putting": {
+      "rating": 2
+    },
+    "X-Factor": {
+      "rating": 2
+    },
+    "notes": ""
+  },
+  "Bobby": {
+    "Driving": {
+      "rating": 3
+    },
+    "Iron Play": {
+      "rating": 3
+    },
+    "Short Game": {
+      "rating": 3
+    },
+    "Putting": {
+      "rating": 3
+    },
+    "X-Factor": {
+      "rating": 4
+    },
+    "notes": ""
+  },
+  "Booth": {
+    "Driving": {
+      "rating": 3
+    },
+    "Iron Play": {
+      "rating": 2
+    },
+    "Short Game": {
+      "rating": 3
+    },
+    "Putting": {
+      "rating": 4
+    },
+    "X-Factor": {
+      "rating": 2
+    },
+    "notes": ""
+  },
+  "Clinton": {
+    "Driving": {
+      "rating": 4
+    },
+    "Iron Play": {
+      "rating": 5
+    },
+    "Short Game": {
+      "rating": 4
+    },
+    "Putting": {
+      "rating": 4
+    },
+    "X-Factor": {
+      "rating": 4
+    },
+    "notes": ""
+  },
+  "J4": {
+    "Driving": {
+      "rating": 3
+    },
+    "Iron Play": {
+      "rating": 3
+    },
+    "Short Game": {
+      "rating": 3
+    },
+    "Putting": {
+      "rating": 3
+    },
+    "X-Factor": {
+      "rating": 3
+    },
+    "notes": ""
+  },
+  "Niemeyer": {
+    "Driving": {
+      "rating": 3
+    },
+    "Iron Play": {
+      "rating": 5
+    },
+    "Short Game": {
+      "rating": 3
+    },
+    "Putting": {
+      "rating": 4
+    },
+    "X-Factor": {
+      "rating": 4
+    },
+    "notes": ""
+  },
+  "Rams": {
+    "Driving": {
+      "rating": 2
+    },
+    "Iron Play": {
+      "rating": 3
+    },
+    "Short Game": {
+      "rating": 3
+    },
+    "Putting": {
+      "rating": 3
+    },
+    "X-Factor": {
+      "rating": 5
+    },
+    "notes": ""
+  },
+  "Rio": {
+    "Driving": {
+      "rating": 3
+    },
+    "Iron Play": {
+      "rating": 3
+    },
+    "Short Game": {
+      "rating": 3
+    },
+    "Putting": {
+      "rating": 3
+    },
+    "X-Factor": {
+      "rating": 3
+    },
+    "notes": ""
+  }
+}

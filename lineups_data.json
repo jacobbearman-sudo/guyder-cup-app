@@ -1,0 +1,48 @@
+{
+  "bb_pairs": [
+    [
+      "Fish",
+      "Littel"
+    ],
+    [
+      "Bearman",
+      "Rames"
+    ],
+    [
+      "Larson",
+      "Doug"
+    ],
+    [
+      "Meyer",
+      "Danny"
+    ]
+  ],
+  "bb_opp_pairs": [
+    [
+      "Clinton",
+      "J4"
+    ],
+    [
+      "Niemeyer",
+      "Rio"
+    ],
+    [
+      "AB",
+      "Rams"
+    ],
+    [
+      "Bobby",
+      "Booth"
+    ]
+  ],
+  "singles": {
+    "Fish": "Clinton",
+    "Rames": "J4",
+    "Bearman": "Rio",
+    "Danny": "Niemeyer",
+    "Larson": "Booth",
+    "Doug": "Clinton",
+    "Meyer": "AB",
+    "Littel": "Rams"
+  }
+}
