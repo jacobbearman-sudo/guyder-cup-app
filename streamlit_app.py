@@ -312,6 +312,12 @@ def scouting_score(player):
     total_weight = sum(SCOUTING_WEIGHTS[c] for c in SCOUTING_CATEGORIES)
     return (total_w / total_weight) - 3
 
+def match_win_pct(player):
+    rec = CAREER.get(player, {}).get("match", "0-0-0")
+    parts = rec.split("-")
+    mw, ml = int(parts[0]), int(parts[1])
+    return mw / (mw + ml) if (mw + ml) > 0 else 0.5
+
 def matchup_grade(stroke_adv, h2h_w, h2h_l, opp_career_pct, fish_player=None, opp_player=None):
     fish_pct = CAREER.get(fish_player, {}).get("pct", 0) if fish_player else 0
 
@@ -319,8 +325,11 @@ def matchup_grade(stroke_adv, h2h_w, h2h_l, opp_career_pct, fish_player=None, op
         h2h_score = 5 + ((h2h_w - h2h_l) / (h2h_w + h2h_l)) * 5
     else:
         h2h_score = 5
+    fish_match_pct = match_win_pct(fish_player) if fish_player else 0.5
+    opp_match_pct = match_win_pct(opp_player) if opp_player else 0.5
+    match_score = min(max(5 + (fish_match_pct - opp_match_pct) * 5, 0), 10)
     career_score = 5 + (fish_pct - opp_career_pct) * 5
-    intangibles = min(max(h2h_score * 0.6 + career_score * 0.4, 0), 10)
+    historical = min(max(h2h_score * 0.50 + match_score * 0.35 + career_score * 0.15, 0), 10)
 
     handicap = min(max(5 + stroke_adv * 1.5, 0), 10)
 
@@ -329,7 +338,7 @@ def matchup_grade(stroke_adv, h2h_w, h2h_l, opp_career_pct, fish_player=None, op
         scout_diff = scouting_score(fish_player) - scouting_score(opp_player)
     scouting = min(max(5 + scout_diff * 2.5, 0), 10)
 
-    total = intangibles * 0.50 + handicap * 0.25 + scouting * 0.25
+    total = historical * 0.50 + handicap * 0.25 + scouting * 0.25
 
     if total >= 6.5:
         grade = "A"
@@ -338,7 +347,7 @@ def matchup_grade(stroke_adv, h2h_w, h2h_l, opp_career_pct, fish_player=None, op
     else:
         grade = "C"
 
-    return grade, {"intangibles": round(intangibles, 1), "handicap": round(handicap, 1), "scouting": round(scouting, 1), "total": round(total, 1)}
+    return grade, {"historical": round(historical, 1), "handicap": round(handicap, 1), "scouting": round(scouting, 1), "total": round(total, 1)}
 
 def bb_matchup_grade(f1, f2, b1, b2):
     fish_low_h = min(course_hcap(TEAM_FISH[f1], "Highlands"), course_hcap(TEAM_FISH[f2], "Highlands"))
@@ -361,14 +370,17 @@ def bb_matchup_grade(f1, f2, b1, b2):
     avg_fish_pct = (CAREER.get(f1, {}).get("pct", 0) + CAREER.get(f2, {}).get("pct", 0)) / 2
     avg_opp_pct = (CAREER.get(b1, {}).get("pct", 0) + CAREER.get(b2, {}).get("pct", 0)) / 2
     career_score = 5 + (avg_fish_pct - avg_opp_pct) * 5
-    intangibles = min(max(h2h_score * 0.6 + career_score * 0.4, 0), 10)
+    avg_fish_match = (match_win_pct(f1) + match_win_pct(f2)) / 2
+    avg_opp_match = (match_win_pct(b1) + match_win_pct(b2)) / 2
+    match_score = min(max(5 + (avg_fish_match - avg_opp_match) * 5, 0), 10)
+    historical = min(max(h2h_score * 0.50 + match_score * 0.35 + career_score * 0.15, 0), 10)
 
     fish_scout = (scouting_score(f1) + scouting_score(f2)) / 2
     opp_scout = (scouting_score(b1) + scouting_score(b2)) / 2
     scout_diff = fish_scout - opp_scout
     scouting = min(max(5 + scout_diff * 2.5, 0), 10)
 
-    total = intangibles * 0.50 + handicap * 0.25 + scouting * 0.25
+    total = historical * 0.50 + handicap * 0.25 + scouting * 0.25
 
     if total >= 6.5:
         grade = "A"
@@ -377,7 +389,7 @@ def bb_matchup_grade(f1, f2, b1, b2):
     else:
         grade = "C"
 
-    return grade, {"intangibles": round(intangibles, 1), "handicap": round(handicap, 1), "scouting": round(scouting, 1), "total": round(total, 1)}
+    return grade, {"historical": round(historical, 1), "handicap": round(handicap, 1), "scouting": round(scouting, 1), "total": round(total, 1)}
 
 
 # ── SIDEBAR ───────────────────────────────────────────────────────────────────
@@ -440,7 +452,7 @@ def build_war_room_context():
     lines.append("\n## Course Handicap Formula")
     lines.append("Course Handicap = Index * (Slope / 113) + (Rating - Par)")
     lines.append("\n## Matchup Grading System (Category Blend 50/25/25)")
-    lines.append("Three sub-scores 0-10: Intangibles (H2H win rate 60% + career W% differential 40%), Handicap Edge (stroke advantage), Scouting (rating differential).")
+    lines.append("Three sub-scores 0-10: Historical Performance (H2H win rate 50% + match W% differential 35% + career W% differential 15%), Handicap Edge (stroke advantage), Scouting (rating differential).")
     lines.append("Total = Intangibles*0.50 + Handicap*0.25 + Scouting*0.25. A>=6.5, B>=4, C<4. All sub-scores centered at 5 (neutral/even).")
     lines.append("\n## Career Stats")
     for name in sorted(CAREER.keys()):
@@ -463,7 +475,7 @@ def build_war_room_context():
             w, l, h, _ = get_h2h(fp, opp)
             opp_pct = CAREER.get(opp, {}).get("pct", 0)
             grade, breakdown = matchup_grade(h_diff, w, l, opp_pct, fp, opp)
-            lines.append(f"{fp} vs {opp}: strokes H={h_diff:+.0f} K={k_diff:+.0f}, H2H={w}-{l}-{h}, opp_pct={opp_pct:.0%}, grade={grade} (intangibles={breakdown['intangibles']}, handicap={breakdown['handicap']}, scouting={breakdown['scouting']})")
+            lines.append(f"{fp} vs {opp}: strokes H={h_diff:+.0f} K={k_diff:+.0f}, H2H={w}-{l}-{h}, opp_pct={opp_pct:.0%}, grade={grade} (historical={breakdown['historical']}, handicap={breakdown['handicap']}, scouting={breakdown['scouting']})")
     if "scouting" in st.session_state:
         scouted = {p: s for p, s in st.session_state.scouting.items() if any(s.get(c, {}).get("rating", 3) != 3 for c in SCOUTING_CATEGORIES) or s.get("notes", "")}
         if scouted:
@@ -572,14 +584,14 @@ with tab1:
             h2h_str = f"{w}-{l}-{h}" if w + l + h > 0 else "N/A"
             st.metric("H2H", h2h_str)
         with cols[5]:
-            st.metric("Opp W%", f"{CAREER.get(choice, {}).get('pct', 0):.0%}")
+            st.metric("Opp W%", f"{match_win_pct(choice):.0%}")
         with cols[6]:
             grade, breakdown = matchup_grade(
                 (course_hcap(opp_idx, "Highlands") - course_hcap(TEAM_FISH[fish_player], "Highlands")),
                 w, l, opp_pct, fish_player, choice
             )
             color = {"A": "green", "B": "blue", "C": "orange"}[grade]
-            st.markdown(f":{color}[**{grade}**]", help=f"Intangibles: {breakdown['intangibles']}/10 (50%)\nHandicap: {breakdown['handicap']}/10 (25%)\nScouting: {breakdown['scouting']}/10 (25%)\nTotal: {breakdown['total']}/10")
+            st.markdown(f":{color}[**{grade}**]", help=f"Historical Performance: {breakdown['historical']}/10 (50%)\nHandicap: {breakdown['handicap']}/10 (25%)\nScouting: {breakdown['scouting']}/10 (25%)\nTotal: {breakdown['total']}/10")
 
         fish_sc = scouting_score(fish_player)
         opp_sc = scouting_score(choice)
@@ -714,7 +726,7 @@ with tab2:
             bb_color = {"A": "green", "B": "blue", "C": "orange"}[bb_grade]
             _bb_header.markdown(
                 f"#### Match {i+1} &nbsp; :{bb_color}[**{bb_grade}**]",
-                help=f"Intangibles: {bb_breakdown['intangibles']}/10 (50%)\nHandicap: {bb_breakdown['handicap']}/10 (25%)\nScouting: {bb_breakdown['scouting']}/10 (25%)\nTotal: {bb_breakdown['total']}/10"
+                help=f"Historical Performance: {bb_breakdown['historical']}/10 (50%)\nHandicap: {bb_breakdown['handicap']}/10 (25%)\nScouting: {bb_breakdown['scouting']}/10 (25%)\nTotal: {bb_breakdown['total']}/10"
             )
 
             f1_h = course_hcap(TEAM_FISH[f1], "Highlands")
@@ -749,6 +761,10 @@ with tab2:
             opp_low_h = min(b1_h, b2_h)
             fish_low_k = min(f1_k, f2_k)
             opp_low_k = min(b1_k, b2_k)
+            fish_high_h = max(f1_h, f2_h)
+            opp_high_h = max(b1_h, b2_h)
+            fish_high_k = max(f1_k, f2_k)
+            opp_high_k = max(b1_k, b2_k)
             spread_f = abs(TEAM_FISH[f1] - TEAM_FISH[f2])
 
             mc1, mc2, mc3 = st.columns(3)
@@ -760,6 +776,15 @@ with tab2:
                         delta=f"{k_edge:+.0f} strokes" if k_edge != 0 else "Even")
             pattern = "Anchor + Floater" if spread_f > 8 else "Balanced"
             mc3.metric("Pairing style", pattern)
+
+            hc1, hc2, hc3 = st.columns(3)
+            hh_edge = fish_high_h - opp_high_h
+            hk_edge = fish_high_k - opp_high_k
+            hc1.metric("High ball — Highlands", f"{fish_high_h:.0f} vs {opp_high_h:.0f}",
+                        delta=f"{hh_edge:+.0f} strokes" if hh_edge != 0 else "Even")
+            hc2.metric("High ball — The Keep", f"{fish_high_k:.0f} vs {opp_high_k:.0f}",
+                        delta=f"{hk_edge:+.0f} strokes" if hk_edge != 0 else "Even")
+            hc3.empty()
 
             fish_scout = (scouting_score(f1) + scouting_score(f2)) / 2
             opp_scout = (scouting_score(b1) + scouting_score(b2)) / 2
@@ -867,19 +892,23 @@ with tab4:
     for name in sorted({**TEAM_FISH, **TEAM_BOOTH}.keys()):
         c = CAREER.get(name, {})
         team = "Fish" if name in TEAM_FISH else "Booth"
+        match_rec = c.get("match", "0-0-0")
+        parts = match_rec.split("-")
+        mw, ml = int(parts[0]), int(parts[1])
+        match_pct = round(100 * mw / (mw + ml)) if (mw + ml) > 0 else 0
         career_rows.append({
             "Player": name, "Team": team,
-            "Overall": c.get("overall", "N/A"),
+            "Guyder Record": c.get("overall", "N/A"),
             "Match record": c.get("match", "N/A"),
             "Total pts": c.get("pts", 0),
-            "Overall W%": c.get("pct", 0),
+            "Match W%": match_pct,
         })
 
     df_career = pd.DataFrame(career_rows).sort_values("Total pts", ascending=False)
     st.dataframe(
         df_career, hide_index=True, use_container_width=True,
         column_config={
-            "Overall W%": st.column_config.ProgressColumn(format="%.0f%%", min_value=0, max_value=1),
+            "Match W%": st.column_config.NumberColumn(format="%d%%"),
         },
     )
 
@@ -1078,7 +1107,7 @@ with tab6:
             "Opponent": bp,
             "Grade": grade,
             "Total": bd["total"],
-            "Intangibles (50%)": bd["intangibles"],
+            "Historical Performance (50%)": bd["historical"],
             "Handicap (25%)": bd["handicap"],
             "Scouting (25%)": bd["scouting"],
             "Strokes": f"{sa:+.1f}",
