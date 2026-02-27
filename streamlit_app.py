@@ -556,7 +556,7 @@ with tab1:
         if current not in opponents_list:
             current = opponents_list[0]
 
-        cols = st.columns([2, 2, 1, 1, 1, 1, 1])
+        cols = st.columns([2, 2, 1, 1, 1, 1])
         with cols[0]:
             st.markdown(f"**{fish_player}** ({TEAM_FISH[fish_player]})")
         with cols[1]:
@@ -568,26 +568,22 @@ with tab1:
         new_assignments[fish_player] = choice
 
         opp_idx = TEAM_BOOTH[choice]
-        h_diff = stroke_diff(TEAM_FISH[fish_player], opp_idx, "Highlands")
         k_diff = stroke_diff(TEAM_FISH[fish_player], opp_idx, "The Keep")
         w, l, h, _ = get_h2h(fish_player, choice)
         opp_pct = CAREER.get(choice, {}).get("pct", 0)
-        grade, _ = matchup_grade((abs(h_diff) + abs(k_diff)) / 2 if h_diff < 0 else -(abs(h_diff) + abs(k_diff)) / 2, w, l, opp_pct, fish_player, choice)
+        grade, _ = matchup_grade(k_diff, w, l, opp_pct, fish_player, choice)
 
         with cols[2]:
-            strokes = round(course_hcap(opp_idx, "Highlands") - course_hcap(TEAM_FISH[fish_player], "Highlands"))
-            st.metric("Strokes (H)", f"+{strokes}" if strokes > 0 else str(strokes))
-        with cols[3]:
             strokes_k = round(course_hcap(opp_idx, "The Keep") - course_hcap(TEAM_FISH[fish_player], "The Keep"))
-            st.metric("Strokes (K)", f"+{strokes_k}" if strokes_k > 0 else str(strokes_k))
-        with cols[4]:
+            st.metric("Strokes", f"+{strokes_k}" if strokes_k > 0 else str(strokes_k))
+        with cols[3]:
             h2h_str = f"{w}-{l}-{h}" if w + l + h > 0 else "N/A"
             st.metric("H2H", h2h_str)
-        with cols[5]:
+        with cols[4]:
             st.metric("Opp W%", f"{match_win_pct(choice):.0%}")
-        with cols[6]:
+        with cols[5]:
             grade, breakdown = matchup_grade(
-                (course_hcap(opp_idx, "Highlands") - course_hcap(TEAM_FISH[fish_player], "Highlands")),
+                k_diff,
                 w, l, opp_pct, fish_player, choice
             )
             color = {"A": "green", "B": "blue", "C": "orange"}[grade]
@@ -632,20 +628,17 @@ with tab1:
     for fp in fish_order:
         opp = new_assignments[fp]
         opp_idx = TEAM_BOOTH[opp]
-        h_strokes = round(course_hcap(opp_idx, "Highlands") - course_hcap(TEAM_FISH[fp], "Highlands"))
         k_strokes = round(course_hcap(opp_idx, "The Keep") - course_hcap(TEAM_FISH[fp], "The Keep"))
-        summary_data.append({"Match": f"{fp} vs {opp}", "Highlands strokes": h_strokes, "Keep strokes": k_strokes})
+        summary_data.append({"Match": f"{fp} vs {opp}", "Strokes": k_strokes})
 
     df_summary = pd.DataFrame(summary_data)
     st.bar_chart(df_summary.set_index("Match"))
 
-    total_h = sum(d["Highlands strokes"] for d in summary_data)
-    total_k = sum(d["Keep strokes"] for d in summary_data)
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Total stroke edge (Highlands)", f"+{total_h}" if total_h > 0 else str(total_h))
-    c2.metric("Total stroke edge (The Keep)", f"+{total_k}" if total_k > 0 else str(total_k))
-    favorable = sum(1 for d in summary_data if d["Highlands strokes"] > 0)
-    c3.metric("Favorable matchups", f"{favorable}/8")
+    total_k = sum(d["Strokes"] for d in summary_data)
+    c1, c2 = st.columns(2)
+    c1.metric("Total stroke edge (The Keep)", f"+{total_k}" if total_k > 0 else str(total_k))
+    favorable = sum(1 for d in summary_data if d["Strokes"] > 0)
+    c2.metric("Favorable matchups", f"{favorable}/8")
 
 
 # ── TAB 2: BEST BALL ──────────────────────────────────────────────────────────
