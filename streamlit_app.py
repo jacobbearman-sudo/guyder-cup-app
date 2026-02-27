@@ -64,7 +64,7 @@ COURSES = {
 SCHEDULE = [
     ("THURS PM", "Highlands", "1:00 - 1:30"),
     ("FRI AM", "The Keep", "8:30 - 8:50"),
-    ("FRI PM", "Highlands", "2:00 - 2:50"),
+    ("FRI PM", "The Keep", "2:00 - 2:50"),
     ("SAT AM", "The Keep", "10:40 - 11:10"),
 ]
 
@@ -350,11 +350,9 @@ def matchup_grade(stroke_adv, h2h_w, h2h_l, opp_career_pct, fish_player=None, op
     return grade, {"historical": round(historical, 1), "handicap": round(handicap, 1), "scouting": round(scouting, 1), "total": round(total, 1)}
 
 def bb_matchup_grade(f1, f2, b1, b2):
-    fish_low_h = min(course_hcap(TEAM_FISH[f1], "Highlands"), course_hcap(TEAM_FISH[f2], "Highlands"))
-    opp_low_h = min(course_hcap(TEAM_BOOTH[b1], "Highlands"), course_hcap(TEAM_BOOTH[b2], "Highlands"))
     fish_low_k = min(course_hcap(TEAM_FISH[f1], "The Keep"), course_hcap(TEAM_FISH[f2], "The Keep"))
     opp_low_k = min(course_hcap(TEAM_BOOTH[b1], "The Keep"), course_hcap(TEAM_BOOTH[b2], "The Keep"))
-    avg_edge = ((opp_low_h - fish_low_h) + (opp_low_k - fish_low_k)) / 2
+    avg_edge = opp_low_k - fish_low_k
     handicap = min(max(5 + avg_edge * 1.5, 0), 10)
 
     total_w, total_l = 0, 0
@@ -548,6 +546,18 @@ with tab1:
         else:
             st.session_state.singles_assignments = {f: default_order[i] for i, f in enumerate(fish_order)}
 
+    save_s_col, status_s_col = st.columns([1, 4])
+    with save_s_col:
+        if st.button("💾 Save singles lineup", type="primary", use_container_width=True):
+            lineups = load_lineups()
+            lineups["singles"] = st.session_state.singles_assignments
+            save_lineups(lineups)
+            st.session_state._singles_saved = True
+    with status_s_col:
+        if st.session_state.get("_singles_saved"):
+            st.success("Singles lineup saved!", icon="✅")
+            st.session_state._singles_saved = False
+
     new_assignments = {}
     opponents_list = list(TEAM_BOOTH.keys())
 
@@ -608,18 +618,6 @@ with tab1:
                 st.caption(" · ".join(insight_parts))
 
     st.session_state.singles_assignments = new_assignments
-
-    save_s_col, status_s_col = st.columns([1, 4])
-    with save_s_col:
-        if st.button("💾 Save singles lineup", type="primary", use_container_width=True):
-            lineups = load_lineups()
-            lineups["singles"] = st.session_state.singles_assignments
-            save_lineups(lineups)
-            st.session_state._singles_saved = True
-    with status_s_col:
-        if st.session_state.get("_singles_saved"):
-            st.success("Singles lineup saved!", icon="✅")
-            st.session_state._singles_saved = False
 
     st.divider()
     st.subheader("Matchup summary")
@@ -722,16 +720,11 @@ with tab2:
                 help=f"Historical Performance: {bb_breakdown['historical']}/10 (50%)\nHandicap: {bb_breakdown['handicap']}/10 (25%)\nScouting: {bb_breakdown['scouting']}/10 (25%)\nTotal: {bb_breakdown['total']}/10"
             )
 
-            f1_h = course_hcap(TEAM_FISH[f1], "Highlands")
-            f2_h = course_hcap(TEAM_FISH[f2], "Highlands")
-            b1_h = course_hcap(TEAM_BOOTH[b1], "Highlands")
-            b2_h = course_hcap(TEAM_BOOTH[b2], "Highlands")
             f1_k = course_hcap(TEAM_FISH[f1], "The Keep")
             f2_k = course_hcap(TEAM_FISH[f2], "The Keep")
             b1_k = course_hcap(TEAM_BOOTH[b1], "The Keep")
             b2_k = course_hcap(TEAM_BOOTH[b2], "The Keep")
 
-            low_h = min(f1_h, f2_h, b1_h, b2_h)
             low_k = min(f1_k, f2_k, b1_k, b2_k)
 
             def _off_low(hcap, low):
@@ -741,43 +734,30 @@ with tab2:
             ol, ir = st.columns(2)
             with ol:
                 st.caption(
-                    f"{f1} — H: {f1_h:.0f}{_off_low(f1_h, low_h)} &nbsp;|&nbsp; K: {f1_k:.0f}{_off_low(f1_k, low_k)}  \n"
-                    f"{f2} — H: {f2_h:.0f}{_off_low(f2_h, low_h)} &nbsp;|&nbsp; K: {f2_k:.0f}{_off_low(f2_k, low_k)}"
+                    f"{f1} — K: {f1_k:.0f}{_off_low(f1_k, low_k)}  \n"
+                    f"{f2} — K: {f2_k:.0f}{_off_low(f2_k, low_k)}"
                 )
             with ir:
                 st.caption(
-                    f"{b1} — H: {b1_h:.0f}{_off_low(b1_h, low_h)} &nbsp;|&nbsp; K: {b1_k:.0f}{_off_low(b1_k, low_k)}  \n"
-                    f"{b2} — H: {b2_h:.0f}{_off_low(b2_h, low_h)} &nbsp;|&nbsp; K: {b2_k:.0f}{_off_low(b2_k, low_k)}"
+                    f"{b1} — K: {b1_k:.0f}{_off_low(b1_k, low_k)}  \n"
+                    f"{b2} — K: {b2_k:.0f}{_off_low(b2_k, low_k)}"
                 )
 
-            fish_low_h = min(f1_h, f2_h)
-            opp_low_h = min(b1_h, b2_h)
             fish_low_k = min(f1_k, f2_k)
             opp_low_k = min(b1_k, b2_k)
-            fish_high_h = max(f1_h, f2_h)
-            opp_high_h = max(b1_h, b2_h)
             fish_high_k = max(f1_k, f2_k)
             opp_high_k = max(b1_k, b2_k)
             spread_f = abs(TEAM_FISH[f1] - TEAM_FISH[f2])
 
             mc1, mc2, mc3 = st.columns(3)
-            h_edge = fish_low_h - opp_low_h
-            k_edge = fish_low_k - opp_low_k
-            mc1.metric("Low ball — Highlands", f"{fish_low_h:.0f} vs {opp_low_h:.0f}",
-                        delta=f"{h_edge:+.0f} strokes" if h_edge != 0 else "Even")
-            mc2.metric("Low ball — The Keep", f"{fish_low_k:.0f} vs {opp_low_k:.0f}",
+            k_edge = round(fish_low_k) - round(opp_low_k)
+            mc1.metric("Low ball — The Keep", f"{fish_low_k:.0f} vs {opp_low_k:.0f}",
                         delta=f"{k_edge:+.0f} strokes" if k_edge != 0 else "Even")
+            hk_edge = round(fish_high_k) - round(opp_high_k)
+            mc2.metric("High ball — The Keep", f"{fish_high_k:.0f} vs {opp_high_k:.0f}",
+                        delta=f"{hk_edge:+.0f} strokes" if hk_edge != 0 else "Even")
             pattern = "Anchor + Floater" if spread_f > 8 else "Balanced"
             mc3.metric("Pairing style", pattern)
-
-            hc1, hc2, hc3 = st.columns(3)
-            hh_edge = fish_high_h - opp_high_h
-            hk_edge = fish_high_k - opp_high_k
-            hc1.metric("High ball — Highlands", f"{fish_high_h:.0f} vs {opp_high_h:.0f}",
-                        delta=f"{hh_edge:+.0f} strokes" if hh_edge != 0 else "Even")
-            hc2.metric("High ball — The Keep", f"{fish_high_k:.0f} vs {opp_high_k:.0f}",
-                        delta=f"{hk_edge:+.0f} strokes" if hk_edge != 0 else "Even")
-            hc3.empty()
 
             fish_scout = (scouting_score(f1) + scouting_score(f2)) / 2
             opp_scout = (scouting_score(b1) + scouting_score(b2)) / 2
