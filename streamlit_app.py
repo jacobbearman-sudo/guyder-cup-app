@@ -304,6 +304,11 @@ def get_h2h(player_a, player_b):
 SCOUTING_CATEGORIES = ["Driving", "Iron Play", "Short Game", "Putting", "X-Factor"]
 SCOUTING_WEIGHTS = {"Driving": 1, "Iron Play": 1, "Short Game": 1, "Putting": 1, "X-Factor": 2}
 
+COURSE_SKILL_WEIGHTS = {
+    "Highlands": {"Driving": 1, "Iron Play": 3, "Short Game": 2, "Putting": 3, "X-Factor": 3},
+    "The Keep": {"Driving": 3, "Iron Play": 2, "Short Game": 1, "Putting": 1, "X-Factor": 3},
+}
+
 def scouting_score(player):
     if "scouting" not in st.session_state:
         return 0
@@ -311,6 +316,43 @@ def scouting_score(player):
     total_w = sum(SCOUTING_WEIGHTS[c] * (ratings.get(c, {}).get("rating", 3)) for c in SCOUTING_CATEGORIES)
     total_weight = sum(SCOUTING_WEIGHTS[c] for c in SCOUTING_CATEGORIES)
     return (total_w / total_weight) - 3
+
+def course_fit_score(player, course_name):
+    if "scouting" not in st.session_state:
+        return 3.0
+    ratings = st.session_state.scouting.get(player, {})
+    weights = COURSE_SKILL_WEIGHTS[course_name]
+    total_w = sum(weights[c] * ratings.get(c, {}).get("rating", 3) for c in SCOUTING_CATEGORIES)
+    total_weight = sum(weights[c] for c in SCOUTING_CATEGORIES)
+    return total_w / total_weight
+
+def course_fit_grade(score):
+    if score >= 4.0:
+        return "A"
+    elif score >= 3.0:
+        return "B"
+    return "C"
+
+def singles_record(player):
+    w, l, h = 0, 0, 0
+    for m in MATCH_HISTORY:
+        if m["type"] != "Singles":
+            continue
+        if m["team_a"] == player:
+            if m["winner"] == "a":
+                w += 1
+            elif m["winner"] == "b":
+                l += 1
+            else:
+                h += 1
+        elif m["team_b"] == player:
+            if m["winner"] == "b":
+                w += 1
+            elif m["winner"] == "a":
+                l += 1
+            else:
+                h += 1
+    return f"{w}-{l}-{h}"
 
 def match_win_pct(player):
     rec = CAREER.get(player, {}).get("match", "0-0-0")
@@ -331,14 +373,19 @@ def matchup_grade(stroke_adv, h2h_w, h2h_l, opp_career_pct, fish_player=None, op
     career_score = 5 + (fish_pct - opp_career_pct) * 5
     historical = min(max(h2h_score * 0.50 + match_score * 0.35 + career_score * 0.15, 0), 10)
 
-    handicap = min(max(5 + stroke_adv * 1.5, 0), 10)
+    handicap = min(max(5 - stroke_adv * 1.5, 0), 10)
 
     scout_diff = 0
     if fish_player and opp_player:
         scout_diff = scouting_score(fish_player) - scouting_score(opp_player)
     scouting = min(max(5 + scout_diff * 2.5, 0), 10)
 
-    total = historical * 0.50 + handicap * 0.25 + scouting * 0.25
+    fish_fit = course_fit_score(fish_player, "The Keep") if fish_player else 3.0
+    opp_fit = course_fit_score(opp_player, "The Keep") if opp_player else 3.0
+    fit_diff = fish_fit - opp_fit
+    course_fit = min(max(5 + fit_diff * 2.5, 0), 10)
+
+    total = historical * 0.35 + scouting * 0.25 + course_fit * 0.25 + handicap * 0.15
 
     if total >= 6.5:
         grade = "A"
@@ -347,13 +394,13 @@ def matchup_grade(stroke_adv, h2h_w, h2h_l, opp_career_pct, fish_player=None, op
     else:
         grade = "C"
 
-    return grade, {"historical": round(historical, 1), "handicap": round(handicap, 1), "scouting": round(scouting, 1), "total": round(total, 1)}
+    return grade, {"historical": round(historical, 1), "handicap": round(handicap, 1), "scouting": round(scouting, 1), "course_fit": round(course_fit, 1), "total": round(total, 1)}
 
 def bb_matchup_grade(f1, f2, b1, b2):
     fish_low_k = min(course_hcap(TEAM_FISH[f1], "The Keep"), course_hcap(TEAM_FISH[f2], "The Keep"))
     opp_low_k = min(course_hcap(TEAM_BOOTH[b1], "The Keep"), course_hcap(TEAM_BOOTH[b2], "The Keep"))
     avg_edge = opp_low_k - fish_low_k
-    handicap = min(max(5 + avg_edge * 1.5, 0), 10)
+    handicap = min(max(5 - avg_edge * 1.5, 0), 10)
 
     total_w, total_l = 0, 0
     for fp in (f1, f2):
@@ -378,7 +425,12 @@ def bb_matchup_grade(f1, f2, b1, b2):
     scout_diff = fish_scout - opp_scout
     scouting = min(max(5 + scout_diff * 2.5, 0), 10)
 
-    total = historical * 0.50 + handicap * 0.25 + scouting * 0.25
+    fish_fit = (course_fit_score(f1, "The Keep") + course_fit_score(f2, "The Keep")) / 2
+    opp_fit = (course_fit_score(b1, "The Keep") + course_fit_score(b2, "The Keep")) / 2
+    fit_diff = fish_fit - opp_fit
+    course_fit = min(max(5 + fit_diff * 2.5, 0), 10)
+
+    total = historical * 0.35 + scouting * 0.25 + course_fit * 0.25 + handicap * 0.15
 
     if total >= 6.5:
         grade = "A"
@@ -387,7 +439,7 @@ def bb_matchup_grade(f1, f2, b1, b2):
     else:
         grade = "C"
 
-    return grade, {"historical": round(historical, 1), "handicap": round(handicap, 1), "scouting": round(scouting, 1), "total": round(total, 1)}
+    return grade, {"historical": round(historical, 1), "handicap": round(handicap, 1), "scouting": round(scouting, 1), "course_fit": round(course_fit, 1), "total": round(total, 1)}
 
 
 # ── SIDEBAR ───────────────────────────────────────────────────────────────────
@@ -473,7 +525,7 @@ def build_war_room_context():
             w, l, h, _ = get_h2h(fp, opp)
             opp_pct = CAREER.get(opp, {}).get("pct", 0)
             grade, breakdown = matchup_grade(h_diff, w, l, opp_pct, fp, opp)
-            lines.append(f"{fp} vs {opp}: strokes H={h_diff:+.0f} K={k_diff:+.0f}, H2H={w}-{l}-{h}, opp_pct={opp_pct:.0%}, grade={grade} (historical={breakdown['historical']}, handicap={breakdown['handicap']}, scouting={breakdown['scouting']})")
+            lines.append(f"{fp} vs {opp}: strokes H={h_diff:+.0f} K={k_diff:+.0f}, H2H={w}-{l}-{h}, opp_pct={opp_pct:.0%}, grade={grade} (historical={breakdown['historical']}, handicap={breakdown['handicap']}, scouting={breakdown['scouting']}, course_fit={breakdown['course_fit']})")
     if "scouting" in st.session_state:
         scouted = {p: s for p, s in st.session_state.scouting.items() if any(s.get(c, {}).get("rating", 3) != 3 for c in SCOUTING_CATEGORIES) or s.get("notes", "")}
         if scouted:
@@ -517,14 +569,20 @@ if prompt := st.sidebar.chat_input("Ask about matchups..."):
         st.sidebar.markdown(response)
     st.session_state.chat_history.append({"role": "assistant", "content": response})
 
+if "scouting" not in st.session_state:
+    st.session_state.scouting = load_scouting_data()
+    for p in st.session_state.scouting:
+        if "Mental" in st.session_state.scouting[p] and "X-Factor" not in st.session_state.scouting[p]:
+            st.session_state.scouting[p]["X-Factor"] = st.session_state.scouting[p].pop("Mental")
+
 # ── TABS ──────────────────────────────────────────────────────────────────────
 
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+tab1, tab2, tab5, tab4, tab3, tab6 = st.tabs([
     ":crossed_swords: Singles Matchups",
     ":handshake: Best Ball Pairings",
-    ":mountain: Course Fit",
-    ":scroll: History",
     ":mag: Scouting Report",
+    ":scroll: History",
+    ":mountain: Course Fit",
     ":bar_chart: Matchup Matrix",
 ])
 
@@ -566,7 +624,7 @@ with tab1:
         if current not in opponents_list:
             current = opponents_list[0]
 
-        cols = st.columns([2, 2, 1, 1, 1, 1])
+        cols = st.columns([2, 2, 1, 1, 1, 1, 1, 1, 1])
         with cols[0]:
             st.markdown(f"**{fish_player}** ({TEAM_FISH[fish_player]})")
         with cols[1]:
@@ -587,35 +645,46 @@ with tab1:
             strokes_k = round(course_hcap(opp_idx, "The Keep") - course_hcap(TEAM_FISH[fish_player], "The Keep"))
             st.metric("Strokes", f"+{strokes_k}" if strokes_k > 0 else str(strokes_k))
         with cols[3]:
+            fish_sc = scouting_score(fish_player)
+            opp_sc = scouting_score(choice)
+            has_scouting = "scouting" in st.session_state and (fish_player in st.session_state.scouting or choice in st.session_state.scouting)
+            if has_scouting:
+                scout_edge = fish_sc - opp_sc
+                se_str = f"+{scout_edge:.1f}" if scout_edge > 0 else f"{scout_edge:.1f}"
+                st.metric("Scout", se_str)
+            else:
+                st.metric("Scout", "—")
+        with cols[4]:
             h2h_str = f"{w}-{l}-{h}" if w + l + h > 0 else "N/A"
             st.metric("H2H", h2h_str)
-        with cols[4]:
-            st.metric("Opp W%", f"{match_win_pct(choice):.0%}")
         with cols[5]:
+            fish_fit = course_fit_score(fish_player, "The Keep")
+            opp_fit = course_fit_score(choice, "The Keep")
+            fit_diff = fish_fit - opp_fit
+            fit_str = f"+{fit_diff:.1f}" if fit_diff > 0 else f"{fit_diff:.1f}"
+            st.metric("Fit", fit_str)
+        with cols[6]:
+            st.metric("Opp Singles", singles_record(choice))
+        with cols[7]:
             grade, breakdown = matchup_grade(
                 k_diff,
                 w, l, opp_pct, fish_player, choice
             )
+            win_pct = breakdown["total"] * 10
+            st.metric("Win%", f"{win_pct:.0f}%", help=f"Historical: {breakdown['historical']}/10 × 35% = {breakdown['historical']*0.35:.1f}\nScouting: {breakdown['scouting']}/10 × 25% = {breakdown['scouting']*0.25:.1f}\nCourse Fit: {breakdown['course_fit']}/10 × 25% = {breakdown['course_fit']*0.25:.1f}\nHandicap: {breakdown['handicap']}/10 × 15% = {breakdown['handicap']*0.15:.1f}\nTotal: {breakdown['total']}/10 → {win_pct:.0f}%")
+        with cols[8]:
             color = {"A": "green", "B": "blue", "C": "orange"}[grade]
-            st.markdown(f":{color}[**{grade}**]", help=f"Historical Performance: {breakdown['historical']}/10 (50%)\nHandicap: {breakdown['handicap']}/10 (25%)\nScouting: {breakdown['scouting']}/10 (25%)\nTotal: {breakdown['total']}/10")
+            st.markdown(f":{color}[**{grade}**]", help=f"Historical: {breakdown['historical']}/10 (35%)\nScouting: {breakdown['scouting']}/10 (25%)\nCourse Fit: {breakdown['course_fit']}/10 (25%)\nHandicap: {breakdown['handicap']}/10 (15%)\nTotal: {breakdown['total']}/10")
 
-        fish_sc = scouting_score(fish_player)
-        opp_sc = scouting_score(choice)
-        if fish_sc != 0 or opp_sc != 0:
-            scout_edge = fish_sc - opp_sc
-            fish_notes = st.session_state.get("scouting", {}).get(fish_player, {}).get("notes", "")
-            opp_notes = st.session_state.get("scouting", {}).get(choice, {}).get("notes", "")
-            insight_parts = []
-            if scout_edge > 0.5:
-                insight_parts.append(f":green[Scout edge +{scout_edge:.1f}]")
-            elif scout_edge < -0.5:
-                insight_parts.append(f":red[Scout edge {scout_edge:.1f}]")
-            if fish_notes:
-                insight_parts.append(f"**{fish_player}**: {fish_notes[:80]}")
-            if opp_notes:
-                insight_parts.append(f"**{choice}**: {opp_notes[:80]}")
-            if insight_parts:
-                st.caption(" · ".join(insight_parts))
+        fish_notes = st.session_state.get("scouting", {}).get(fish_player, {}).get("notes", "")
+        opp_notes = st.session_state.get("scouting", {}).get(choice, {}).get("notes", "")
+        note_parts = []
+        if fish_notes:
+            note_parts.append(f"**{fish_player}**: {fish_notes[:80]}")
+        if opp_notes:
+            note_parts.append(f"**{choice}**: {opp_notes[:80]}")
+        if note_parts:
+            st.caption(" · ".join(note_parts))
 
     st.session_state.singles_assignments = new_assignments
 
@@ -717,7 +786,7 @@ with tab2:
             bb_color = {"A": "green", "B": "blue", "C": "orange"}[bb_grade]
             _bb_header.markdown(
                 f"#### Match {i+1} &nbsp; :{bb_color}[**{bb_grade}**]",
-                help=f"Historical Performance: {bb_breakdown['historical']}/10 (50%)\nHandicap: {bb_breakdown['handicap']}/10 (25%)\nScouting: {bb_breakdown['scouting']}/10 (25%)\nTotal: {bb_breakdown['total']}/10"
+                help=f"Historical: {bb_breakdown['historical']}/10 (35%)\nScouting: {bb_breakdown['scouting']}/10 (25%)\nCourse Fit: {bb_breakdown['course_fit']}/10 (25%)\nHandicap: {bb_breakdown['handicap']}/10 (15%)\nTotal: {bb_breakdown['total']}/10"
             )
 
             f1_k = course_hcap(TEAM_FISH[f1], "The Keep")
@@ -790,6 +859,50 @@ with tab3:
             c3.metric("Par", cdata["par"])
             c4.metric("Yardage", f"{cdata['yardage']:,}")
             st.caption(cdata["notes"])
+
+    st.divider()
+    st.subheader("Course fit grades")
+    st.caption("Based on scouting ratings weighted by skills each course demands. Fill in the Scouting Report tab to see personalized grades.")
+
+    for cname in COURSES:
+        weights = COURSE_SKILL_WEIGHTS[cname]
+        top_skills = sorted(SCOUTING_CATEGORIES, key=lambda c: weights[c], reverse=True)
+        key_skills = [s for s in top_skills if weights[s] >= 2]
+
+        with st.container(border=True):
+            st.markdown(f"**{cname}** — Key skills: {', '.join(f'{s} (x{weights[s]})' for s in key_skills)}")
+
+            fit_rows = []
+            all_players = {**TEAM_FISH, **TEAM_BOOTH}
+            for name in sorted(all_players.keys()):
+                team = "Fish" if name in TEAM_FISH else "Booth"
+                score = course_fit_score(name, cname)
+                grade = course_fit_grade(score)
+                row = {"Player": name, "Team": team, "Fit Score": round(score, 1), "Grade": grade}
+                ratings = st.session_state.get("scouting", {}).get(name, {})
+                for s in SCOUTING_CATEGORIES:
+                    row[s] = ratings.get(s, {}).get("rating", 3)
+                fit_rows.append(row)
+
+            df_fit = pd.DataFrame(fit_rows).sort_values("Fit Score", ascending=False)
+
+            def _color_fit_grade(val):
+                if val == "A":
+                    return "background-color: #d4edda; color: #155724"
+                elif val == "B":
+                    return "background-color: #cce5ff; color: #004085"
+                elif val == "C":
+                    return "background-color: #fff3cd; color: #856404"
+                return ""
+
+            st.dataframe(
+                df_fit.style.map(_color_fit_grade, subset=["Grade"]),
+                hide_index=True,
+                use_container_width=True,
+                column_config={
+                    "Fit Score": st.column_config.NumberColumn(format="%.1f"),
+                },
+            )
 
     st.divider()
     st.subheader("Course handicaps - all players")
@@ -942,12 +1055,6 @@ with tab5:
         "and lower-rated opponents shift the grade favorably."
     )
 
-    if "scouting" not in st.session_state:
-        st.session_state.scouting = load_scouting_data()
-        for p in st.session_state.scouting:
-            if "Mental" in st.session_state.scouting[p] and "X-Factor" not in st.session_state.scouting[p]:
-                st.session_state.scouting[p]["X-Factor"] = st.session_state.scouting[p].pop("Mental")
-
     save_col, status_col = st.columns([1, 4])
     with save_col:
         if st.button("💾 Save scouting data", type="primary", use_container_width=True):
@@ -1080,9 +1187,10 @@ with tab6:
             "Opponent": bp,
             "Grade": grade,
             "Total": bd["total"],
-            "Historical Performance (50%)": bd["historical"],
-            "Handicap (25%)": bd["handicap"],
+            "Historical (35%)": bd["historical"],
             "Scouting (25%)": bd["scouting"],
+            "Course Fit (25%)": bd["course_fit"],
+            "Handicap (15%)": bd["handicap"],
             "Strokes": f"{sa:+.1f}",
             "H2H": f"{w}-{l}-{h}" if w + l + h > 0 else "-",
             "Opp W%": f"{opp_pct:.0%}",
