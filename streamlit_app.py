@@ -577,13 +577,14 @@ if "scouting" not in st.session_state:
 
 # ── TABS ──────────────────────────────────────────────────────────────────────
 
-tab1, tab2, tab5, tab4, tab3, tab6 = st.tabs([
+tab1, tab2, tab5, tab4, tab3, tab6, tab7 = st.tabs([
     ":crossed_swords: Singles Matchups",
     ":handshake: Best Ball Pairings",
     ":mag: Scouting Report",
     ":scroll: History",
     ":mountain: Course Fit",
     ":bar_chart: Matchup Matrix",
+    ":trophy: H2H Singles",
 ])
 
 
@@ -1202,3 +1203,68 @@ with tab6:
         hide_index=True,
         use_container_width=True,
     )
+
+# ── TAB 7: H2H SINGLES ──────────────────────────────────────────────────────
+
+with tab7:
+    st.header("H2H Singles History")
+    st.caption("All head-to-head singles match results for each player.")
+
+    team_booth_col, team_fish_col = st.columns(2)
+
+    with team_booth_col:
+        st.subheader("Team Booth")
+    with team_fish_col:
+        st.subheader("Team Fish")
+
+    def _singles_history(player):
+        singles_matches = []
+        for m in MATCH_HISTORY:
+            if m["type"] != "Singles":
+                continue
+            if m["team_a"] == player:
+                opponent = m["team_b"]
+                if m["winner"] == "a":
+                    result_str = f"W {m['result']}"
+                elif m["winner"] == "b":
+                    result_str = f"L {m['result']}"
+                else:
+                    result_str = "Halved"
+                singles_matches.append({
+                    "Opponent": opponent, "Result": result_str,
+                    "Year": m["year"], "Event": m["event"], "Course": m["course"],
+                })
+            elif m["team_b"] == player:
+                opponent = m["team_a"]
+                if m["winner"] == "b":
+                    result_str = f"W {m['result']}"
+                elif m["winner"] == "a":
+                    result_str = f"L {m['result']}"
+                else:
+                    result_str = "Halved"
+                singles_matches.append({
+                    "Opponent": opponent, "Result": result_str,
+                    "Year": m["year"], "Event": m["event"], "Course": m["course"],
+                })
+        w = sum(1 for s in singles_matches if s["Result"].startswith("W"))
+        l = sum(1 for s in singles_matches if s["Result"].startswith("L"))
+        h = sum(1 for s in singles_matches if s["Result"].startswith("H"))
+        return singles_matches, f"{w}-{l}-{h}"
+
+    for booth_player in sorted(TEAM_BOOTH.keys(), key=lambda n: TEAM_BOOTH[n]):
+        singles_matches, record = _singles_history(booth_player)
+        with team_booth_col:
+            with st.expander(f"**{booth_player}** ({TEAM_BOOTH[booth_player]}) — {record}", expanded=False):
+                if singles_matches:
+                    st.dataframe(pd.DataFrame(singles_matches), hide_index=True, use_container_width=True)
+                else:
+                    st.info("No singles match history.")
+
+    for fish_player in sorted(TEAM_FISH.keys(), key=lambda n: TEAM_FISH[n]):
+        singles_matches, record = _singles_history(fish_player)
+        with team_fish_col:
+            with st.expander(f"**{fish_player}** ({TEAM_FISH[fish_player]}) — {record}", expanded=False):
+                if singles_matches:
+                    st.dataframe(pd.DataFrame(singles_matches), hide_index=True, use_container_width=True)
+                else:
+                    st.info("No singles match history.")
