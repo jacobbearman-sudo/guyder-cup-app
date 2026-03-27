@@ -327,11 +327,15 @@ def course_fit_score(player, course_name):
     return total_w / total_weight
 
 def course_fit_grade(score):
-    if score >= 4.0:
+    if score >= 4.5:
         return "A"
-    elif score >= 3.0:
+    elif score >= 3.5:
         return "B"
-    return "C"
+    elif score >= 2.5:
+        return "C"
+    elif score >= 1.5:
+        return "D"
+    return "F"
 
 def singles_record(player):
     w, l, h = 0, 0, 0
@@ -435,12 +439,16 @@ def matchup_grade(stroke_adv, h2h_w, h2h_l, opp_career_pct, fish_player=None, op
 
     total = historical * 0.35 + scouting * 0.25 + course_fit * 0.25 + handicap * 0.15
 
-    if total >= 6.5:
+    if total >= 7.5:
         grade = "A"
-    elif total >= 4:
+    elif total >= 6:
         grade = "B"
-    else:
+    elif total >= 4.5:
         grade = "C"
+    elif total >= 3:
+        grade = "D"
+    else:
+        grade = "F"
 
     return grade, {"historical": round(historical, 1), "handicap": round(handicap, 1), "scouting": round(scouting, 1), "course_fit": round(course_fit, 1), "total": round(total, 1)}
 
@@ -480,12 +488,16 @@ def bb_matchup_grade(f1, f2, b1, b2):
 
     total = historical * 0.35 + scouting * 0.25 + course_fit * 0.25 + handicap * 0.15
 
-    if total >= 6.5:
+    if total >= 7.5:
         grade = "A"
-    elif total >= 4:
+    elif total >= 6:
         grade = "B"
-    else:
+    elif total >= 4.5:
         grade = "C"
+    elif total >= 3:
+        grade = "D"
+    else:
+        grade = "F"
 
     return grade, {"historical": round(historical, 1), "handicap": round(handicap, 1), "scouting": round(scouting, 1), "course_fit": round(course_fit, 1), "total": round(total, 1)}
 
@@ -728,6 +740,10 @@ with tab1:
                     return "background-color: #cce5ff; color: #004085"
                 elif val == "C":
                     return "background-color: #fff3cd; color: #856404"
+                elif val == "D":
+                    return "background-color: #f8d7da; color: #721c24"
+                elif val == "F":
+                    return "background-color: #dc3545; color: #ffffff"
                 return ""
 
             styled = df_matchups.style.apply(_highlight_assigned, axis=1).map(_color_grade, subset=["Grade"])
@@ -830,7 +846,7 @@ with tab2:
             st.session_state.bb_opp_pairs[i] = (b1, b2)
 
             bb_grade, bb_breakdown = bb_matchup_grade(f1, f2, b1, b2)
-            bb_color = {"A": "green", "B": "blue", "C": "orange"}[bb_grade]
+            bb_color = {"A": "green", "B": "blue", "C": "orange", "D": "red", "F": "red"}[bb_grade]
             _bb_header.markdown(
                 f"#### Match {i+1} &nbsp; :{bb_color}[**{bb_grade}**]",
                 help=f"Historical: {bb_breakdown['historical']}/10 (35%)\nScouting: {bb_breakdown['scouting']}/10 (25%)\nCourse Fit: {bb_breakdown['course_fit']}/10 (25%)\nHandicap: {bb_breakdown['handicap']}/10 (15%)\nTotal: {bb_breakdown['total']}/10"
@@ -940,6 +956,10 @@ with tab3:
                     return "background-color: #cce5ff; color: #004085"
                 elif val == "C":
                     return "background-color: #fff3cd; color: #856404"
+                elif val == "D":
+                    return "background-color: #f8d7da; color: #721c24"
+                elif val == "F":
+                    return "background-color: #dc3545; color: #ffffff"
                 return ""
 
             st.dataframe(
@@ -1210,6 +1230,10 @@ with tab6:
                 return "background-color: #cce5ff; color: #004085"
             elif val.startswith("C"):
                 return "background-color: #fff3cd; color: #856404"
+            elif val.startswith("D"):
+                return "background-color: #f8d7da; color: #721c24"
+            elif val.startswith("F"):
+                return "background-color: #dc3545; color: #ffffff"
         return ""
 
     st.dataframe(
