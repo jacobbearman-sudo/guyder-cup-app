@@ -910,21 +910,20 @@ with tab2:
 # ── TAB 3: COURSE FIT ─────────────────────────────────────────────────────────
 
 with tab3:
-    st.header("Course fit analysis")
+    st.header("Course fit — The Keep")
 
-    for cname, cdata in COURSES.items():
-        with st.container(border=True):
-            st.subheader(f"{cname}")
-            c1, c2, c3, c4 = st.columns(4)
-            c1.metric("Slope", cdata["slope"])
-            c2.metric("Rating", cdata["rating"])
-            c3.metric("Par", cdata["par"])
-            c4.metric("Yardage", f"{cdata['yardage']:,}")
-            st.caption(cdata["notes"])
+    cdata = COURSES["The Keep"]
+    with st.container(border=True):
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Slope", cdata["slope"])
+        c2.metric("Rating", cdata["rating"])
+        c3.metric("Par", cdata["par"])
+        c4.metric("Yardage", f"{cdata['yardage']:,}")
+        st.caption(cdata["notes"])
 
     st.divider()
     st.subheader("Course fit grades")
-    st.caption("Based on scouting ratings weighted by skills each course demands. Fill in the Scouting Report tab to see personalized grades.")
+    st.caption("Based on scouting ratings weighted by skills The Keep demands. Fill in the Scouting Report tab to see personalized grades.")
 
     for cname in COURSE_SKILL_WEIGHTS:
         weights = COURSE_SKILL_WEIGHTS[cname]
@@ -971,19 +970,16 @@ with tab3:
             )
 
     st.divider()
-    st.subheader("Course handicaps - all players")
+    st.subheader("Course handicaps")
 
     rows = []
     all_players = {**TEAM_FISH, **TEAM_BOOTH}
     for name, idx in sorted(all_players.items(), key=lambda x: x[1]):
-        h_hcap = course_hcap(idx, "Highlands")
         k_hcap = course_hcap(idx, "The Keep")
-        diff = round(k_hcap - h_hcap, 1)
         team = "Fish" if name in TEAM_FISH else "Booth"
         rows.append({
             "Player": name, "Team": team, "Index": idx,
-            "Highlands": h_hcap, "The Keep": k_hcap,
-            "Keep - Highlands": diff,
+            "The Keep": k_hcap,
         })
 
     df_course = pd.DataFrame(rows)
@@ -991,9 +987,7 @@ with tab3:
         df_course,
         hide_index=True,
         column_config={
-            "Highlands": st.column_config.NumberColumn(format="%.1f"),
             "The Keep": st.column_config.NumberColumn(format="%.1f"),
-            "Keep - Highlands": st.column_config.NumberColumn(format="%+.1f"),
         },
         use_container_width=True,
     )
@@ -1002,36 +996,17 @@ with tab3:
     st.subheader("Stroke matchup grid")
     st.caption("Strokes Team Fish player RECEIVES from each opponent (positive = advantage)")
 
-    course_sel = st.segmented_control("Course", ["Highlands", "The Keep"], default="Highlands", key="course_grid")
-
     grid_rows = []
     for fp, fi in sorted(TEAM_FISH.items(), key=lambda x: x[1]):
         row = {"Fish Player": fp}
         for op, oi in sorted(TEAM_BOOTH.items(), key=lambda x: x[1]):
-            diff = round(course_hcap(oi, course_sel) - course_hcap(fi, course_sel))
+            diff = round(course_hcap(oi, "The Keep") - course_hcap(fi, "The Keep"))
             row[op] = diff
         grid_rows.append(row)
 
     df_grid = pd.DataFrame(grid_rows)
     st.dataframe(df_grid, hide_index=True, use_container_width=True)
 
-    st.divider()
-    st.subheader("Round deployment recommendation")
-    st.caption("Which round should each player ideally play their key match?")
-
-    for day, course, times in SCHEDULE:
-        with st.container(border=True):
-            st.markdown(f"**{day}: {course}** ({times})")
-            if course == "Highlands":
-                st.caption(
-                    "Mountain course, huge greens, wide fairways, big elevation changes. "
-                    "Favors accurate iron players. Lost balls on steep hillsides punish wayward shots."
-                )
-            else:
-                st.caption(
-                    "Tighter, longer, higher slope. Demands shot shaping and length. "
-                    "Higher course handicaps across the board."
-                )
 
 
 # ── TAB 4: HISTORY ─────────────────────────────────────────────────────────────
