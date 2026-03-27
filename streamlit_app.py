@@ -53,9 +53,9 @@ COURSES = {
         "designer": "Bill Bergin & Rees Jones",
         "notes": (
             "Championship course at McLemore Resort on Lookout Mountain, Rising Fawn, GA. "
-            "1.5 miles of cliff edge with dramatic views. Higher slope (140) and rating (73.7) "
-            "than Highlands. Blue tees at 7,067 yards. Over 70 acres of fairway. "
-            "Tighter than Highlands with more demanding shot shaping. "
+            "1.5 miles of cliff edge with dramatic views. Slope 140, rating 73.7. "
+            "Blue tees at 7,067 yards. Over 70 acres of fairway. "
+            "Demanding shot shaping off the tee with tight corridors. "
             "Favors: longer hitters who can work the ball both ways."
         ),
     },
@@ -301,11 +301,11 @@ def get_h2h(player_a, player_b):
             details.append(f"{yr} Cradle: L")
     return wins, losses, halves, details
 
-SCOUTING_CATEGORIES = ["Driving", "Iron Play", "Short Game", "Putting", "X-Factor"]
-SCOUTING_WEIGHTS = {"Driving": 1, "Iron Play": 1, "Short Game": 1, "Putting": 1, "X-Factor": 2}
+SCOUTING_CATEGORIES = ["Driving Dist", "Driving Acc", "Iron Dist", "Iron Acc", "Short Game", "Putting", "Shot Shape", "X-Factor"]
+SCOUTING_WEIGHTS = {"Driving Dist": 1, "Driving Acc": 1, "Iron Dist": 1, "Iron Acc": 1, "Short Game": 1, "Putting": 1, "Shot Shape": 1, "X-Factor": 2}
 
 COURSE_SKILL_WEIGHTS = {
-    "The Keep": {"Driving": 3, "Iron Play": 2, "Short Game": 1, "Putting": 1, "X-Factor": 3},
+    "The Keep": {"Driving Dist": 3, "Driving Acc": 2, "Iron Dist": 2, "Iron Acc": 2, "Short Game": 1, "Putting": 1, "Shot Shape": 3, "X-Factor": 3},
 }
 
 def scouting_score(player):
@@ -499,6 +499,120 @@ def bb_matchup_grade(f1, f2, b1, b2):
         grade = "F"
 
     return grade, {"historical": round(historical, 1), "handicap": round(handicap, 1), "scouting": round(scouting, 1), "course_fit": round(course_fit, 1), "total": round(total, 1)}
+
+
+def bb_pair_history(p1, p2):
+    w, l = 0, 0
+    for m in MATCH_HISTORY:
+        if m["type"] != "BB":
+            continue
+        pair_a = set(m["team_a"].split("/"))
+        pair_b = set(m["team_b"].split("/"))
+        pair = {p1, p2}
+        if pair == pair_a:
+            if m["winner"] == "a":
+                w += 1
+            elif m["winner"] == "b":
+                l += 1
+        elif pair == pair_b:
+            if m["winner"] == "b":
+                w += 1
+            elif m["winner"] == "a":
+                l += 1
+    return w, l
+
+
+def bb_individual_record(player):
+    w, l = 0, 0
+    for m in MATCH_HISTORY:
+        if m["type"] != "BB":
+            continue
+        in_a = player in m["team_a"].split("/")
+        in_b = player in m["team_b"].split("/")
+        if in_a:
+            if m["winner"] == "a":
+                w += 1
+            elif m["winner"] == "b":
+                l += 1
+        elif in_b:
+            if m["winner"] == "b":
+                w += 1
+            elif m["winner"] == "a":
+                l += 1
+    return w, l
+
+
+def scouting_complement_score(p1, p2):
+    if "scouting" not in st.session_state:
+        return 5.0
+    r1 = st.session_state.scouting.get(p1, {})
+    r2 = st.session_state.scouting.get(p2, {})
+    if not r1 and not r2:
+        return 5.0
+    covered = 0
+    for cat in SCOUTING_CATEGORIES:
+        v1 = r1.get(cat, {}).get("rating", 3)
+        v2 = r2.get(cat, {}).get("rating", 3)
+        best = max(v1, v2)
+        covered += best
+    return min(max((covered / len(SCOUTING_CATEGORIES) - 3) * 5, 0), 10)
+
+
+def bb_partner_grade(p1, p2):
+    idx1, idx2 = TEAM_FISH[p1], TEAM_FISH[p2]
+    spread = abs(idx1 - idx2)
+    if spread >= 12:
+        hcap_score = 9.0
+    elif spread >= 8:
+        hcap_score = 7.5
+    elif spread >= 4:
+        hcap_score = 5.5
+    else:
+        hcap_score = 3.5
+
+    complement = scouting_complement_score(p1, p2)
+
+    fit1 = course_fit_score(p1, "The Keep")
+    fit2 = course_fit_score(p2, "The Keep")
+    avg_fit = (fit1 + fit2) / 2
+    best_fit = max(fit1, fit2)
+    combined_fit = min(max((avg_fit + best_fit) / 2 - 2, 0) * 3.33, 10)
+
+    pair_w, pair_l = bb_pair_history(p1, p2)
+    ind_w1, ind_l1 = bb_individual_record(p1)
+    ind_w2, ind_l2 = bb_individual_record(p2)
+    if pair_w + pair_l > 0:
+        pair_pct = pair_w / (pair_w + pair_l)
+        history = min(max(pair_pct * 10, 0), 10)
+    else:
+        total_ind_w = ind_w1 + ind_w2
+        total_ind_l = ind_l1 + ind_l2
+        if total_ind_w + total_ind_l > 0:
+            ind_pct = total_ind_w / (total_ind_w + total_ind_l)
+            history = min(max(ind_pct * 10, 0), 10)
+        else:
+            history = 5.0
+
+    total = hcap_score * 0.30 + complement * 0.25 + combined_fit * 0.25 + history * 0.20
+
+    if total >= 7.5:
+        grade = "A"
+    elif total >= 6:
+        grade = "B"
+    elif total >= 4.5:
+        grade = "C"
+    elif total >= 3:
+        grade = "D"
+    else:
+        grade = "F"
+
+    return grade, {
+        "handicap_spread": round(hcap_score, 1),
+        "scouting_comp": round(complement, 1),
+        "course_fit": round(combined_fit, 1),
+        "bb_history": round(history, 1),
+        "total": round(total, 1),
+    }
 
 
 # ── SIDEBAR ───────────────────────────────────────────────────────────────────
@@ -773,138 +887,58 @@ with tab1:
 # ── TAB 2: BEST BALL ──────────────────────────────────────────────────────────
 
 with tab2:
-    st.header("Best ball pairing builder")
-    st.caption("Build 4 pairs from each team.")
+    st.header("Best ball partner finder")
+    st.caption("Find the best Team Fish pairings. Each player's potential partners are graded on handicap spread, scouting complement, course fit, and BB history.")
 
-    if "bb_pairs" not in st.session_state:
-        saved_bb = load_lineups()
-        if "bb_pairs" in saved_bb:
-            st.session_state.bb_pairs = [tuple(p) for p in saved_bb["bb_pairs"]]
-        else:
-            st.session_state.bb_pairs = [
-                ("Fish", "Doug"), ("Bearman", "Rames"),
-                ("Larson", "Danny"), ("Meyer", "Littel"),
-            ]
-    if "bb_opp_pairs" not in st.session_state:
-        saved_bb = load_lineups()
-        if "bb_opp_pairs" in saved_bb:
-            st.session_state.bb_opp_pairs = [tuple(p) for p in saved_bb["bb_opp_pairs"]]
-        else:
-            st.session_state.bb_opp_pairs = [
-                ("Clinton", "Bobby"), ("Niemeyer", "Rio"),
-                ("J4", "Rams"), ("AB", "Booth"),
-            ]
+    fish_sorted = sorted(TEAM_FISH.keys(), key=lambda n: TEAM_FISH[n])
 
-    fish_names = list(TEAM_FISH.keys())
-    booth_names = list(TEAM_BOOTH.keys())
+    for fish_player in fish_sorted:
+        fi = TEAM_FISH[fish_player]
+        with st.expander(f"**{fish_player}** ({fi})"):
+            partners = [p for p in fish_sorted if p != fish_player]
 
-    save_bb_col, status_bb_col = st.columns([1, 4])
-    with save_bb_col:
-        if st.button("💾 Save best ball lineup", type="primary", use_container_width=True):
-            lineups = load_lineups()
-            lineups["bb_pairs"] = [list(p) for p in st.session_state.bb_pairs]
-            lineups["bb_opp_pairs"] = [list(p) for p in st.session_state.bb_opp_pairs]
-            save_lineups(lineups)
-            st.session_state._bb_saved = True
-    with status_bb_col:
-        if st.session_state.get("_bb_saved"):
-            st.success("Best ball lineup saved!", icon="✅")
-            st.session_state._bb_saved = False
+            rows = []
+            for partner in partners:
+                pi = TEAM_FISH[partner]
+                grade, bd = bb_partner_grade(fish_player, partner)
 
-    for i in range(4):
-        with st.container(border=True):
-            _bb_header = st.empty()
+                low_hcap = min(course_hcap(fi, "The Keep"), course_hcap(pi, "The Keep"))
+                spread = abs(fi - pi)
+                style = "Anchor+Floater" if spread > 8 else "Balanced"
 
-            left_team, right_team = st.columns(2)
+                pair_w, pair_l = bb_pair_history(fish_player, partner)
+                bb_rec = f"{pair_w}-{pair_l}" if pair_w + pair_l > 0 else "—"
 
-            with left_team:
-                st.markdown("**Team Fish**")
-                lc1, lc2 = st.columns(2)
-                with lc1:
-                    f1 = st.selectbox("Player 1", fish_names,
-                                      index=fish_names.index(st.session_state.bb_pairs[i][0]) if st.session_state.bb_pairs[i][0] in fish_names else 0,
-                                      key=f"bb_f1_{i}")
-                with lc2:
-                    f2 = st.selectbox("Player 2", fish_names,
-                                      index=fish_names.index(st.session_state.bb_pairs[i][1]) if st.session_state.bb_pairs[i][1] in fish_names else 0,
-                                      key=f"bb_f2_{i}")
+                rows.append({
+                    "Partner": f"{partner} ({pi})",
+                    "Grade": grade,
+                    "Total": bd["total"],
+                    "Spread (30%)": bd["handicap_spread"],
+                    "Scout (25%)": bd["scouting_comp"],
+                    "Fit (25%)": bd["course_fit"],
+                    "History (20%)": bd["bb_history"],
+                    "BB Rec": bb_rec,
+                    "Low Hcap": f"{low_hcap:.0f}",
+                    "Style": style,
+                })
 
-            with right_team:
-                st.markdown("**Team Booth**")
-                rc1, rc2 = st.columns(2)
-                with rc1:
-                    b1 = st.selectbox("Player 1", booth_names,
-                                      index=booth_names.index(st.session_state.bb_opp_pairs[i][0]) if st.session_state.bb_opp_pairs[i][0] in booth_names else 0,
-                                      key=f"bb_b1_{i}")
-                with rc2:
-                    b2 = st.selectbox("Player 2", booth_names,
-                                      index=booth_names.index(st.session_state.bb_opp_pairs[i][1]) if st.session_state.bb_opp_pairs[i][1] in booth_names else 0,
-                                      key=f"bb_b2_{i}")
+            df_partners = pd.DataFrame(rows).sort_values("Total", ascending=False)
 
-            st.session_state.bb_pairs[i] = (f1, f2)
-            st.session_state.bb_opp_pairs[i] = (b1, b2)
+            def _color_bb_grade(val):
+                if val == "A":
+                    return "background-color: #d4edda; color: #155724"
+                elif val == "B":
+                    return "background-color: #cce5ff; color: #004085"
+                elif val == "C":
+                    return "background-color: #fff3cd; color: #856404"
+                elif val == "D":
+                    return "background-color: #f8d7da; color: #721c24"
+                elif val == "F":
+                    return "background-color: #dc3545; color: #ffffff"
+                return ""
 
-            bb_grade, bb_breakdown = bb_matchup_grade(f1, f2, b1, b2)
-            bb_color = {"A": "green", "B": "blue", "C": "orange", "D": "red", "F": "red"}[bb_grade]
-            _bb_header.markdown(
-                f"#### Match {i+1} &nbsp; :{bb_color}[**{bb_grade}**]",
-                help=f"Historical: {bb_breakdown['historical']}/10 (35%)\nScouting: {bb_breakdown['scouting']}/10 (25%)\nCourse Fit: {bb_breakdown['course_fit']}/10 (25%)\nHandicap: {bb_breakdown['handicap']}/10 (15%)\nTotal: {bb_breakdown['total']}/10"
-            )
-
-            f1_k = course_hcap(TEAM_FISH[f1], "The Keep")
-            f2_k = course_hcap(TEAM_FISH[f2], "The Keep")
-            b1_k = course_hcap(TEAM_BOOTH[b1], "The Keep")
-            b2_k = course_hcap(TEAM_BOOTH[b2], "The Keep")
-
-            low_k = min(f1_k, f2_k, b1_k, b2_k)
-
-            def _off_low(hcap, low):
-                diff = round(hcap - low)
-                return f" **(+{diff})**" if diff > 0 else " **(low)**"
-
-            ol, ir = st.columns(2)
-            with ol:
-                st.caption(
-                    f"{f1} — K: {f1_k:.0f}{_off_low(f1_k, low_k)}  \n"
-                    f"{f2} — K: {f2_k:.0f}{_off_low(f2_k, low_k)}"
-                )
-            with ir:
-                st.caption(
-                    f"{b1} — K: {b1_k:.0f}{_off_low(b1_k, low_k)}  \n"
-                    f"{b2} — K: {b2_k:.0f}{_off_low(b2_k, low_k)}"
-                )
-
-            fish_low_k = min(f1_k, f2_k)
-            opp_low_k = min(b1_k, b2_k)
-            fish_high_k = max(f1_k, f2_k)
-            opp_high_k = max(b1_k, b2_k)
-            spread_f = abs(TEAM_FISH[f1] - TEAM_FISH[f2])
-
-            mc1, mc2, mc3 = st.columns(3)
-            k_edge = round(fish_low_k) - round(opp_low_k)
-            mc1.metric("Low ball — The Keep", f"{fish_low_k:.0f} vs {opp_low_k:.0f}",
-                        delta=f"{k_edge:+.0f} strokes" if k_edge != 0 else "Even")
-            hk_edge = round(fish_high_k) - round(opp_high_k)
-            mc2.metric("High ball — The Keep", f"{fish_high_k:.0f} vs {opp_high_k:.0f}",
-                        delta=f"{hk_edge:+.0f} strokes" if hk_edge != 0 else "Even")
-            pattern = "Anchor + Floater" if spread_f > 8 else "Balanced"
-            mc3.metric("Pairing style", pattern)
-
-            fish_scout = (scouting_score(f1) + scouting_score(f2)) / 2
-            opp_scout = (scouting_score(b1) + scouting_score(b2)) / 2
-            bb_scout_edge = fish_scout - opp_scout
-            insight_parts = []
-            if bb_scout_edge > 0.3:
-                insight_parts.append(f":green[Scout edge +{bb_scout_edge:.1f}]")
-            elif bb_scout_edge < -0.3:
-                insight_parts.append(f":red[Scout edge {bb_scout_edge:.1f}]")
-            else:
-                insight_parts.append("Scout edge: even")
-            for p in (f1, f2, b1, b2):
-                pnotes = st.session_state.get("scouting", {}).get(p, {}).get("notes", "")
-                if pnotes:
-                    insight_parts.append(f"**{p}**: {pnotes[:60]}")
-            st.caption(" · ".join(insight_parts))
+            styled = df_partners.style.map(_color_bb_grade, subset=["Grade"])
+            st.dataframe(styled, hide_index=True, use_container_width=True)
 
 
 # ── TAB 3: COURSE FIT ─────────────────────────────────────────────────────────
@@ -914,11 +948,12 @@ with tab3:
 
     cdata = COURSES["The Keep"]
     with st.container(border=True):
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Slope", cdata["slope"])
-        c2.metric("Rating", cdata["rating"])
-        c3.metric("Par", cdata["par"])
-        c4.metric("Yardage", f"{cdata['yardage']:,}")
+        c1, c2, c3, c4, c5 = st.columns(5)
+        c1.metric("Tees", cdata["tee"])
+        c2.metric("Slope", cdata["slope"])
+        c3.metric("Rating", cdata["rating"])
+        c4.metric("Par", cdata["par"])
+        c5.metric("Yardage", f"{cdata['yardage']:,}")
         st.caption(cdata["notes"])
 
     st.divider()
@@ -1112,20 +1147,27 @@ with tab5:
     for player in sorted(roster.keys()):
         if player not in st.session_state.scouting:
             st.session_state.scouting[player] = {c: {"rating": 3} for c in SCOUTING_CATEGORIES}
+        else:
+            for c in SCOUTING_CATEGORIES:
+                if c not in st.session_state.scouting[player]:
+                    st.session_state.scouting[player][c] = {"rating": 3}
         if "notes" not in st.session_state.scouting[player]:
             st.session_state.scouting[player]["notes"] = ""
 
         overall = CAREER.get(player, {}).get("match", "N/A")
         with st.expander(f"**{player}** ({roster[player]} index · {overall})", expanded=False):
-            rating_cols = st.columns(len(SCOUTING_CATEGORIES))
-            for j, cat in enumerate(SCOUTING_CATEGORIES):
-                with rating_cols[j]:
-                    val = st.slider(
-                        cat, 1, 5,
-                        value=st.session_state.scouting[player][cat]["rating"],
-                        key=f"scout_{player}_{cat}",
-                    )
-                    st.session_state.scouting[player][cat]["rating"] = val
+            row1_cats = SCOUTING_CATEGORIES[:4]
+            row2_cats = SCOUTING_CATEGORIES[4:]
+            for row_cats in [row1_cats, row2_cats]:
+                cols = st.columns(len(row_cats))
+                for j, cat in enumerate(row_cats):
+                    with cols[j]:
+                        val = st.slider(
+                            cat, 1, 5,
+                            value=st.session_state.scouting[player][cat]["rating"],
+                            key=f"scout_{player}_{cat}",
+                        )
+                        st.session_state.scouting[player][cat]["rating"] = val
 
             avg = sum(SCOUTING_WEIGHTS[c] * st.session_state.scouting[player][c]["rating"] for c in SCOUTING_CATEGORIES) / sum(SCOUTING_WEIGHTS[c] for c in SCOUTING_CATEGORIES)
             labels = {1: "Well Below Avg", 2: "Below Avg", 3: "Average", 4: "Above Avg", 5: "Elite"}
