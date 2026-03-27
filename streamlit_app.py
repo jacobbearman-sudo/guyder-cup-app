@@ -40,21 +40,21 @@ def get_snowflake_conn():
 COURSES = {
     "Highlands": {
         "slope": 138, "rating": 71.3, "par": 71, "yardage": 6618, "tee": "II",
-        "designer": "Donald Steel (2006)",
+        "designer": "Bill Bergin & Rees Jones",
         "notes": (
-            "Mountain course at ~3,000 ft elevation in Blue Ridge Mountains. "
-            "#1 public course in Virginia (Golf Digest). Huge greens, big elevation changes, "
-            "wide fairways but steep hillsides punish misses. Starts Par 5-3-5-3-4-5. "
-            "Bentgrass tee-to-green. Heroic par-3 tee shots over gullies. "
+            "Mountain course atop Lookout Mountain at McLemore Resort in Rising Fawn, GA. "
+            "Huge greens, big elevation changes, wide fairways but steep hillsides punish misses. "
+            "Starts Par 5-3-5-3-4-5. Bentgrass tee-to-green. Heroic par-3 tee shots over gullies. "
             "Favors: accurate iron players & good putters on huge undulating greens."
         ),
     },
     "The Keep": {
-        "slope": 140, "rating": 73.7, "par": 72, "yardage": 6654, "tee": "Blue",
-        "designer": "Primland Sporting Club",
+        "slope": 140, "rating": 73.7, "par": 72, "yardage": 7067, "tee": "Blue",
+        "designer": "Bill Bergin & Rees Jones",
         "notes": (
-            "Newer championship course at Primland. Slightly higher slope (140) and rating (73.7) "
-            "than Highlands. Plays longer with higher par. Blue tees at 6,654 yards. "
+            "Championship course at McLemore Resort on Lookout Mountain, Rising Fawn, GA. "
+            "1.5 miles of cliff edge with dramatic views. Higher slope (140) and rating (73.7) "
+            "than Highlands. Blue tees at 7,067 yards. Over 70 acres of fairway. "
             "Tighter than Highlands with more demanding shot shaping. "
             "Favors: longer hitters who can work the ball both ways."
         ),
@@ -305,7 +305,6 @@ SCOUTING_CATEGORIES = ["Driving", "Iron Play", "Short Game", "Putting", "X-Facto
 SCOUTING_WEIGHTS = {"Driving": 1, "Iron Play": 1, "Short Game": 1, "Putting": 1, "X-Factor": 2}
 
 COURSE_SKILL_WEIGHTS = {
-    "Highlands": {"Driving": 1, "Iron Play": 3, "Short Game": 2, "Putting": 3, "X-Factor": 3},
     "The Keep": {"Driving": 3, "Iron Play": 2, "Short Game": 1, "Putting": 1, "X-Factor": 3},
 }
 
@@ -927,7 +926,7 @@ with tab3:
     st.subheader("Course fit grades")
     st.caption("Based on scouting ratings weighted by skills each course demands. Fill in the Scouting Report tab to see personalized grades.")
 
-    for cname in COURSES:
+    for cname in COURSE_SKILL_WEIGHTS:
         weights = COURSE_SKILL_WEIGHTS[cname]
         top_skills = sorted(SCOUTING_CATEGORIES, key=lambda c: weights[c], reverse=True)
         key_skills = [s for s in top_skills if weights[s] >= 2]
