@@ -360,18 +360,66 @@ def match_win_pct(player):
     mw, ml = int(parts[0]), int(parts[1])
     return mw / (mw + ml) if (mw + ml) > 0 else 0.5
 
-def matchup_grade(stroke_adv, h2h_w, h2h_l, opp_career_pct, fish_player=None, opp_player=None):
-    fish_pct = CAREER.get(fish_player, {}).get("pct", 0) if fish_player else 0
+def singles_match_win_pct(player):
+    w, l, h = 0, 0, 0
+    for m in MATCH_HISTORY:
+        if m["type"] != "Singles":
+            continue
+        if m["team_a"] == player:
+            if m["winner"] == "a":
+                w += 1
+            elif m["winner"] == "b":
+                l += 1
+            else:
+                h += 1
+        elif m["team_b"] == player:
+            if m["winner"] == "b":
+                w += 1
+            elif m["winner"] == "a":
+                l += 1
+            else:
+                h += 1
+    return w / (w + l) if (w + l) > 0 else 0.5
 
-    if h2h_w + h2h_l > 0:
-        h2h_score = 5 + ((h2h_w - h2h_l) / (h2h_w + h2h_l)) * 5
+def get_singles_h2h(player_a, player_b):
+    wins, losses, halves = 0, 0, 0
+    for m in MATCH_HISTORY:
+        if m["type"] != "Singles":
+            continue
+        if m["team_a"] == player_a and m["team_b"] == player_b:
+            if m["winner"] == "a":
+                wins += 1
+            elif m["winner"] == "b":
+                losses += 1
+            else:
+                halves += 1
+        elif m["team_b"] == player_a and m["team_a"] == player_b:
+            if m["winner"] == "b":
+                wins += 1
+            elif m["winner"] == "a":
+                losses += 1
+            else:
+                halves += 1
+    return wins, losses, halves
+
+def matchup_grade(stroke_adv, h2h_w, h2h_l, opp_career_pct, fish_player=None, opp_player=None):
+    sw, sl, sh = get_singles_h2h(fish_player, opp_player) if fish_player and opp_player else (h2h_w, h2h_l, 0)
+
+    if sw + sl > 0:
+        h2h_score = 5 + ((sw - sl) / (sw + sl)) * 5
     else:
         h2h_score = 5
-    fish_match_pct = match_win_pct(fish_player) if fish_player else 0.5
-    opp_match_pct = match_win_pct(opp_player) if opp_player else 0.5
+    fish_match_pct = singles_match_win_pct(fish_player) if fish_player else 0.5
+    opp_match_pct = singles_match_win_pct(opp_player) if opp_player else 0.5
     match_score = min(max(5 + (fish_match_pct - opp_match_pct) * 5, 0), 10)
-    career_score = 5 + (fish_pct - opp_career_pct) * 5
-    historical = min(max(h2h_score * 0.50 + match_score * 0.35 + career_score * 0.15, 0), 10)
+    h2h_total = sw + sl + sh
+    if h2h_total == 0:
+        h2h_w_pct, match_w_pct = 0.60, 0.40
+    elif h2h_total == 1:
+        h2h_w_pct, match_w_pct = 0.50, 0.50
+    else:
+        h2h_w_pct, match_w_pct = 0.70, 0.30
+    historical = min(max(h2h_score * h2h_w_pct + match_score * match_w_pct, 0), 10)
 
     handicap = min(max(5 - stroke_adv * 1.5, 0), 10)
 
@@ -620,72 +668,70 @@ with tab1:
     new_assignments = {}
     opponents_list = list(TEAM_BOOTH.keys())
 
+    booth_sorted = sorted(TEAM_BOOTH.keys(), key=lambda n: TEAM_BOOTH[n])
+
     for fish_player in fish_order:
         current = st.session_state.singles_assignments.get(fish_player, opponents_list[0])
         if current not in opponents_list:
             current = opponents_list[0]
 
-        cols = st.columns([2, 2, 1, 1, 1, 1, 1, 1, 1])
-        with cols[0]:
-            st.markdown(f"**{fish_player}** ({TEAM_FISH[fish_player]})")
-        with cols[1]:
+        with st.expander(f"**{fish_player}** ({TEAM_FISH[fish_player]})", expanded=False):
             choice = st.selectbox(
-                "vs", opponents_list,
+                "Assigned opponent", opponents_list,
                 index=opponents_list.index(current),
-                key=f"singles_{fish_player}", label_visibility="collapsed",
+                key=f"singles_{fish_player}",
             )
-        new_assignments[fish_player] = choice
+            new_assignments[fish_player] = choice
 
-        opp_idx = TEAM_BOOTH[choice]
-        k_diff = stroke_diff(TEAM_FISH[fish_player], opp_idx, "The Keep")
-        w, l, h, _ = get_h2h(fish_player, choice)
-        opp_pct = CAREER.get(choice, {}).get("pct", 0)
-        grade, _ = matchup_grade(k_diff, w, l, opp_pct, fish_player, choice)
+            rows = []
+            for bp in booth_sorted:
+                opp_idx = TEAM_BOOTH[bp]
+                strokes_k = round(course_hcap(opp_idx, "The Keep") - course_hcap(TEAM_FISH[fish_player], "The Keep"))
+                k_diff = stroke_diff(TEAM_FISH[fish_player], opp_idx, "The Keep")
+                w, l, h = get_singles_h2h(fish_player, bp)
+                opp_pct = CAREER.get(bp, {}).get("pct", 0)
+                grade, breakdown = matchup_grade(k_diff, w, l, opp_pct, fish_player, bp)
+                win_pct = breakdown["total"] * 10
 
-        with cols[2]:
-            strokes_k = round(course_hcap(opp_idx, "The Keep") - course_hcap(TEAM_FISH[fish_player], "The Keep"))
-            st.metric("Strokes", f"+{strokes_k}" if strokes_k > 0 else str(strokes_k))
-        with cols[3]:
-            fish_sc = scouting_score(fish_player)
-            opp_sc = scouting_score(choice)
-            has_scouting = "scouting" in st.session_state and (fish_player in st.session_state.scouting or choice in st.session_state.scouting)
-            if has_scouting:
-                scout_edge = fish_sc - opp_sc
-                se_str = f"+{scout_edge:.1f}" if scout_edge > 0 else f"{scout_edge:.1f}"
-                st.metric("Scout", se_str)
-            else:
-                st.metric("Scout", "—")
-        with cols[4]:
-            h2h_str = f"{w}-{l}-{h}" if w + l + h > 0 else "N/A"
-            st.metric("H2H", h2h_str)
-        with cols[5]:
-            fish_fit = course_fit_score(fish_player, "The Keep")
-            opp_fit = course_fit_score(choice, "The Keep")
-            fit_diff = fish_fit - opp_fit
-            fit_str = f"+{fit_diff:.1f}" if fit_diff > 0 else f"{fit_diff:.1f}"
-            st.metric("Fit", fit_str)
-        with cols[6]:
-            st.metric("Opp Singles", singles_record(choice))
-        with cols[7]:
-            grade, breakdown = matchup_grade(
-                k_diff,
-                w, l, opp_pct, fish_player, choice
-            )
-            win_pct = breakdown["total"] * 10
-            st.metric("Win%", f"{win_pct:.0f}%", help=f"Historical: {breakdown['historical']}/10 × 35% = {breakdown['historical']*0.35:.1f}\nScouting: {breakdown['scouting']}/10 × 25% = {breakdown['scouting']*0.25:.1f}\nCourse Fit: {breakdown['course_fit']}/10 × 25% = {breakdown['course_fit']*0.25:.1f}\nHandicap: {breakdown['handicap']}/10 × 15% = {breakdown['handicap']*0.15:.1f}\nTotal: {breakdown['total']}/10 → {win_pct:.0f}%")
-        with cols[8]:
-            color = {"A": "green", "B": "blue", "C": "orange"}[grade]
-            st.markdown(f":{color}[**{grade}**]", help=f"Historical: {breakdown['historical']}/10 (35%)\nScouting: {breakdown['scouting']}/10 (25%)\nCourse Fit: {breakdown['course_fit']}/10 (25%)\nHandicap: {breakdown['handicap']}/10 (15%)\nTotal: {breakdown['total']}/10")
+                fish_sc = scouting_score(fish_player)
+                opp_sc = scouting_score(bp)
+                has_scout = "scouting" in st.session_state and (fish_player in st.session_state.scouting or bp in st.session_state.scouting)
+                scout_str = f"{fish_sc - opp_sc:+.1f}" if has_scout else "—"
 
-        fish_notes = st.session_state.get("scouting", {}).get(fish_player, {}).get("notes", "")
-        opp_notes = st.session_state.get("scouting", {}).get(choice, {}).get("notes", "")
-        note_parts = []
-        if fish_notes:
-            note_parts.append(f"**{fish_player}**: {fish_notes[:80]}")
-        if opp_notes:
-            note_parts.append(f"**{choice}**: {opp_notes[:80]}")
-        if note_parts:
-            st.caption(" · ".join(note_parts))
+                fish_fit = course_fit_score(fish_player, "The Keep")
+                opp_fit = course_fit_score(bp, "The Keep")
+                fit_diff = fish_fit - opp_fit
+
+                rows.append({
+                    "Opponent": f"{bp} ({opp_idx})",
+                    "Strokes": f"+{strokes_k}" if strokes_k > 0 else str(strokes_k),
+                    "Scout": scout_str,
+                    "H2H": f"{w}-{l}-{h}" if w + l + h > 0 else "—",
+                    "Fit": f"{fit_diff:+.1f}",
+                    "Opp Singles": singles_record(bp),
+                    "Win%": f"{win_pct:.0f}%",
+                    "Grade": grade,
+                })
+
+            df_matchups = pd.DataFrame(rows)
+
+            def _highlight_assigned(row):
+                is_assigned = row["Opponent"].startswith(choice)
+                if is_assigned:
+                    return ["background-color: #1a3a2a"] * len(row)
+                return [""] * len(row)
+
+            def _color_grade(val):
+                if val == "A":
+                    return "background-color: #d4edda; color: #155724"
+                elif val == "B":
+                    return "background-color: #cce5ff; color: #004085"
+                elif val == "C":
+                    return "background-color: #fff3cd; color: #856404"
+                return ""
+
+            styled = df_matchups.style.apply(_highlight_assigned, axis=1).map(_color_grade, subset=["Grade"])
+            st.dataframe(styled, hide_index=True, use_container_width=True)
 
     st.session_state.singles_assignments = new_assignments
 
